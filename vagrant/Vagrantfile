@@ -1,17 +1,37 @@
 # -*- mode: ruby -*-
-
+# install hostmanager vagrant plugin.
+# vagrant plugin install hostmanager
 
 Vagrant.configure(2) do |config|
   config.hostmanager.enable = true
   config.hostmanager.ignore_private_ip = false
   config.hostmanager.include_offline = true
-
+  # use vagrant insecure keys
+  config.ssh.insert_key = false
   config.vm.define "puppet" do |puppet|
+    config.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+    end
+    puppet.vm.synced_folder ".", "/vagrant"
+    puppet.vm.synced_folder "../code", "/puppet_code"
+    puppet.vm.synced_folder "../puppetserver", "/puppet_server"
     # puppetmaster on centos/7
     puppet.vm.box = "centos/7" # name of the box on vagrant website.
     puppet.vm.hostname = "puppetmaster.omps.in"
     puppet.vm.network :private_network, ip: "10.0.0.10"
-    puppet.hostmanager.alias = %w(puppet)
+    puppet.hostmanager.aliases = %w(puppet)
+    puppet.vm.provision "shell", inline: <<-SHELL
+    sudo yum update -y
+    sudo rpm -ivh https://yum.puppetlabs.com/puppetlabs-release-pc1-el-7.noarch.rpm
+    sudo yum install puppetserver -y
+    sudo rm -rf /etc/puppetlabs/code
+    sudo ln -s /puppet_code /etc/puppetlabs/code
+    sudo rm -rf /etc/puppetlabs/puppetserver
+    sudo ln -s /puppet_server /etc/puppetlabs/puppetserver
+    sudo sed -i 's/2g/512m/g' /etc/sysconfig/puppetserver
+    echo "*.omps.in" >> sudo tee /etc/puppetlabs/puppet/autosign.conf
+    sudo service puppetserver start
+    SHELL
   end
 
   # config.vm.define "agent1" do |agent1|
@@ -28,6 +48,14 @@ Vagrant.configure(2) do |config|
     agent2.vm.box = "ubuntu/trusty64"
     agent2.vm.hostname = "agent2.omps.in"
     agent2.vm.network :private_network, ip: "10.0.0.12"
-    agent2.hostmanager.alias = %w(agent2)
+    agent2.hostmanager.aliases = %w(agent2)
+    agent2.vm.provision "shell", inline: <<-SHELL
+      wget http://apt.puppetlabs.com/puppetlabs-release-pc1-trusty.deb
+      sudo dpkg -i puppetlabs-release-pc1-trusty.deb
+      sudo apt-get update
+      sudo apt-get install puppet-agent -y
+      sudo /opt/puppetlabs/bin/puppet agent --enable
+      sudo service puppet start
+    SHELL
   end
 end

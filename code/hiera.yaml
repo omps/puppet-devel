@@ -1,0 +1,13 @@
+---
+:backends:
+  - yaml
+
+:hierarchy:
+  - "nodes/%{::trusted.certname}"
+  - common
+  # hello world.
+
+# datadir is empty here, so hiera uses the default.
+# - /etc/puppetlabs/code/environments/%{environment}/hieradata on  *.nix
+# - when specifying the datadir, please make sure the dir exists.
+:datadir:
